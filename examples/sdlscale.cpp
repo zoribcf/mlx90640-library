@@ -29,6 +29,7 @@
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 SDL_Texture *texture = NULL;
+SDL_Texture *texture_r = NULL;
 SDL_Event event;
 
 SDL_Rect rect_preserve_aspect;
@@ -38,6 +39,8 @@ uint32_t pixels[SENSOR_W * SENSOR_H];
 
 bool running = true;
 bool preserve_aspect = true;
+
+int rotation = 0;
 
 
 void put_pixel_false_colour(int x, int y, double v) {
@@ -73,7 +76,7 @@ void put_pixel_false_colour(int x, int y, double v) {
 }
 
 int main(void) {
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 
     if(SDL_Init(SDL_INIT_VIDEO) != 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init() Failed: %s\n", SDL_GetError());
@@ -94,6 +97,12 @@ int main(void) {
     if(texture == NULL){
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateTexture() Failed: %s\n", SDL_GetError());
     }
+
+    texture_r = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, SENSOR_H, SENSOR_H);
+    if(texture_r == NULL){
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateTexture() Failed: %s\n", SDL_GetError());
+    }
+
 
     int display_width, display_height;
 
@@ -172,6 +181,12 @@ int main(void) {
                     case SDLK_ESCAPE:
                         running = false;
                         break;
+                    case SDLK_r:
+                        rotation += 90;
+                        if(rotation == 360){
+                            rotation = 0;
+                        }
+                        break;
                 }
             }
         }
@@ -194,12 +209,16 @@ int main(void) {
 
         SDL_UpdateTexture(texture, NULL, (uint8_t *)pixels, SENSOR_W * sizeof(uint32_t));
 
+        SDL_SetRenderTarget(renderer, texture_r);
+        SDL_RenderCopyEx(renderer, texture, NULL, NULL, rotation, NULL, SDL_FLIP_NONE);
+        SDL_SetRenderTarget(renderer, NULL);
+
         if(preserve_aspect){
-            SDL_RenderCopy(renderer, texture, NULL, &rect_preserve_aspect);
+            SDL_RenderCopy(renderer, texture_r, NULL, &rect_preserve_aspect);
         }
         else
         {
-            SDL_RenderCopy(renderer, texture, NULL, &rect_fullscreen);
+            SDL_RenderCopy(renderer, texture_r, NULL, &rect_fullscreen);
         }
 
         SDL_RenderPresent(renderer);
