@@ -15,9 +15,6 @@
 #define SENSOR_W 24
 #define SENSOR_H 32
 
-#define DISPLAY_W 720
-#define DISPLAY_H 960
-
 // Valid frame rates are 1, 2, 4, 8, 16, 32 and 64
 // The i2c baudrate is set to 1mhz to support these
 #define FPS 8
@@ -32,12 +29,15 @@
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 SDL_Texture *texture = NULL;
-SDL_Rect screen_rect;
 SDL_Event event;
 
-uint8_t pixels[SENSOR_W * SENSOR_H * 3];
+SDL_Rect rect_preserve_aspect;
+SDL_Rect rect_fullscreen;
+
+uint32_t pixels[SENSOR_W * SENSOR_H];
 
 bool running = true;
+bool preserve_aspect = true;
 
 
 void put_pixel_false_colour(int x, int y, double v) {
@@ -63,16 +63,13 @@ void put_pixel_false_colour(int x, int y, double v) {
 
     int ir, ig, ib;
 
-
     ir = (int)((((color[idx2][0] - color[idx1][0]) * fractBetween) + color[idx1][0]) * 255.0);
     ig = (int)((((color[idx2][1] - color[idx1][1]) * fractBetween) + color[idx1][1]) * 255.0);
     ib = (int)((((color[idx2][2] - color[idx1][2]) * fractBetween) + color[idx1][2]) * 255.0);
 
-    int offset = (y * SENSOR_W + x) * 3;
+    int offset = (y * SENSOR_W + x);
 
-    pixels[offset] = ir;
-    pixels[offset + 1] = ig;
-    pixels[offset + 2] = ib;
+    pixels[offset] = (ib << 16) | (ig << 8) | (ir << 0);
 }
 
 int main(void) {
@@ -83,7 +80,7 @@ int main(void) {
         return 1;
     }
 
-    window = SDL_CreateWindow("MLX90640", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, DISPLAY_W, DISPLAY_H, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("MLX90640", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
     if(window == NULL){
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow() Failed: %s\n", SDL_GetError());
     }
@@ -93,12 +90,29 @@ int main(void) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateRenderer() Failed: %s\n", SDL_GetError());
     }
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 24, 32);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, SENSOR_W, SENSOR_H);
     if(texture == NULL){
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateTexture() Failed: %s\n", SDL_GetError());
     }
 
-    screen_rect = (SDL_Rect){.x = 0, .y = 0, .w = DISPLAY_W, .h = DISPLAY_H};
+    int display_width, display_height;
+
+    SDL_GetRendererOutputSize(renderer, &display_width, &display_height);
+
+    int aspect_scale = display_height / SENSOR_H;
+
+    int output_width, output_height;
+
+    output_width = SENSOR_W * aspect_scale;
+    output_height = SENSOR_H * aspect_scale;
+
+    int offset_left, offset_top;
+
+    offset_left = (display_width - output_width) / 2;
+    offset_top = (display_height - output_height) / 2;
+
+    rect_preserve_aspect = (SDL_Rect){.x = offset_left, .y = offset_top, .w = output_width, .h = output_height};
+    rect_fullscreen = (SDL_Rect){.x = 0, .y = 0, .w = display_width, .h = display_height};
 
     static uint16_t eeMLX90640[832];
     float emissivity = 1;
@@ -150,6 +164,16 @@ int main(void) {
                 running = false;
                 break;
             }
+            if(event.type == SDL_KEYDOWN) {
+                switch(event.key.keysym.sym){
+                    case SDLK_SPACE:
+                        preserve_aspect = !preserve_aspect;
+                        break;
+                    case SDLK_ESCAPE:
+                        running = false;
+                        break;
+                }
+            }
         }
 
         auto start = std::chrono::system_clock::now();
@@ -167,9 +191,17 @@ int main(void) {
                 put_pixel_false_colour(y, x, val);
             }
         }
- 
-        SDL_UpdateTexture(texture, NULL, pixels, 24 * 3);
-        SDL_RenderCopy(renderer, texture, NULL, &screen_rect);
+
+        SDL_UpdateTexture(texture, NULL, (uint8_t *)pixels, SENSOR_W * sizeof(uint32_t));
+
+        if(preserve_aspect){
+            SDL_RenderCopy(renderer, texture, NULL, &rect_preserve_aspect);
+        }
+        else
+        {
+            SDL_RenderCopy(renderer, texture, NULL, &rect_fullscreen);
+        }
+
         SDL_RenderPresent(renderer);
 
         auto end = std::chrono::system_clock::now();

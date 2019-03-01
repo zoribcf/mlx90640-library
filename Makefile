@@ -7,7 +7,7 @@ endif
 
 all: examples
 
-examples: test step fbuf interp video
+examples: test step fbuf interp video sdlscale
 
 libMLX90640_API.so: functions/MLX90640_API.o functions/MLX90640_$(I2C_MODE)_I2C_Driver.o
 	$(CXX) -fPIC -shared $^ -o $@ $(I2C_LIBS)
