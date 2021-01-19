@@ -17,7 +17,7 @@ all:
 	@echo ""
 
 build:
-	swig3.0 ${SWIG_ARGS} -c++ -python MLX90640.i
+	swig ${SWIG_ARGS} -c++ -python MLX90640.i
 	${PYTHON} setup.py build
 
 install:

@@ -2,7 +2,7 @@
 %include "stdint.i"
 
 %{
-int setup(int fps);
+int setup(int address, int fps);
 void cleanup(void);
 float * get_frame(void);
 %}
@@ -14,6 +14,6 @@ float * get_frame(void);
     }
 %}
 
-int setup(int fps);
+int setup(int address, int fps);
 void cleanup(void);
 float * get_frame(void);

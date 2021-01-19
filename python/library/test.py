@@ -15,7 +15,7 @@ def temp_to_col(val):
 #     return tuple([int(c*255) for c in colorsys.hsv_to_rgb(1.0, 0.0, val/50.0)])
 
 
-x.setup(16)
+x.setup(0x33, 16)
 f = x.get_frame()
 x.cleanup()
 
